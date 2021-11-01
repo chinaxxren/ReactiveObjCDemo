@@ -9,6 +9,7 @@
 #import "ViewController.h"
 
 #import <ReactiveObjC/ReactiveObjC.h>
+#import <ReactiveObjC/RACReturnSignal.h>
 
 #define kScreenW [[UIScreen mainScreen] bounds].size.width
 
@@ -31,7 +32,8 @@
                           @"RACMulticastConnection",@"RACScheduler",@"flatternMap",@"concat",@"then",@"zipWith",
                           @"reduce",@"take",@"doNext",@"q_signal",@"q_subject",@"replay_siganl",@"replay_subject",
                           @"replayLast",@"replayLazily",@"retry",@"map",@"filter",@"ignore",@"distinctUntilChanged"
-                          ,@"throttle",@"merge"];
+                          ,@"throttle",@"merge",@"timeout",@"inteval",@"delay",@"disposable",@"RACTuple",@"Array"
+                          ,@"Dictoionary",@"liftSelector",@"bind",@"skip"];
     
         for (int i = 0; i < btnTitle.count; i++) {
             UIButton *btn = [[UIButton alloc] init];
@@ -195,6 +197,60 @@
         case 26:
         {
             [self merge];
+        }
+            break;
+        case 27:
+        {
+            [self timeout];
+        }
+            break;
+        case 28:
+        {
+            [self interval];
+        }
+            break;
+        case 29:
+        {
+            [self delay];
+        }
+        case 30:
+        {
+            [self dispose];
+        }
+            break;
+        case 31:
+        {
+            [self RACTuple];
+        }
+            break;
+        case 32:
+        {
+            [self NSArray];
+        }
+            break;
+        case 33:
+        {
+            [self NSDictionary];
+        }
+            break;
+        case 34:
+        {
+            [self liftSelector];
+        }
+            break;
+        case 35:
+        {
+            [self bind];
+        }
+            break;
+        case 36:
+        {
+            [self skip];
+        }
+            break;
+        case 37:
+        {
+            //[self take];
         }
             break;
         default:
@@ -463,33 +519,33 @@
     
 }
 
+// flattenMap 根据前一个信号的参数创建一个新的信号！map 是在源信号返回值上返回的一个新值
 // flattenMap作用:把源信号的内容映射成一个新的信号，信号可以是任意类型。
+// map 和 flattenMap 的作用都是对一个信号进行改造（这两个方法的返回值都是一个信号）。
+// 两者的不同点在于，map 改变了传递的值，flattenMap 改变的是信号本身。 使用 map 的时候，block 中应该 return 你后面希望接收到的值 使用 flattenMap 的时候，block 中应该 return 你想要的信号
 - (void)flatternMap {
-        // 创建信号中的信号
-//        RACSubject *signalOfsignals = [RACSubject subject];
-//        RACSubject *signal = [RACSubject subject];
-//
-//        [[signalOfsignals flattenMap:^RACStream *(id value) {
-//
-//            // 当signalOfsignals的signals发出信号才会调用
-//            return value;
-//
-//        } subscribeNext:^(id x) {
-//
-//            // 只有signalOfsignals的signal发出信号才会调用，因为内部订阅了bindBlock中返回的信号，也就是flattenMap返回的信号。
-//            // 也就是flattenMap返回的信号发出内容([signal sendNext:@1])，才会调用。
-//
-//            NSLog(@"%@aaa",x);
-//        }];
-//
-//        // 信号的信号发送信号
-//        [signalOfsignals sendNext:signal];
-//
-//        // 信号发送内容
-//        [signal sendNext:@1];
+    // 创建信号中的信号
+    RACSubject *subSignal = [RACSubject subject];
+    
+    RACSignal *bindSignal = [subSignal flattenMap:^__kindof RACSignal * _Nullable(id  _Nullable value) {
+        NSLog(@"1---->%@",value);
+       NSString *str = [NSString stringWithFormat:@"111111++++%@",value];
+        return [RACReturnSignal return:str];
+    }];
+    
+    [bindSignal subscribeNext:^(id  _Nullable x) {
+        NSLog(@"加工后的 %@",x);
+    }];
+
+    [subSignal subscribeNext:^(id  _Nullable x) {
+            NSLog(@"未加工的 %@",x);
+    }];
+    
+    // 信号发送内容
+    [subSignal sendNext:@1];
 }
 
-// 按一定顺序拼接信号，当多个信号发出的时候，有顺序的接收信号，依赖关系把一组信号串联起来，前面一个信号complete，后面一个信号才开始发挥作用
+// 按一定顺序拼接信号，当多个信号发出的时候，有顺序的接收信号，依赖关系把一组信号串联起来，第一个信号complete，后面一个信号才开始发挥作用
 // 注意：第一个信号必须发送完成，第二个信号才会被激活
 - (void)concat{
     RACSignal *signalA = [RACSignal createSignal:^RACDisposable *(id<RACSubscriber> subscriber) {
@@ -498,6 +554,7 @@
         [subscriber sendCompleted];
         return nil;
     }];
+    
     RACSignal *signalB = [RACSignal createSignal:^RACDisposable *(id<RACSubscriber> subscriber) {
         NSLog(@"2222222");
         [subscriber sendNext:@2];
@@ -614,6 +671,18 @@
     [signal1 sendNext:@8];
     [signal1 sendNext:@9];
     [signal1 sendCompleted];//必须调完成
+    
+    RACSubject *subject = [RACSubject subject];
+    RACSubject *signal = [RACSubject subject];
+    // takeUntil: 只要 signal Trigger 信号发送了任意数据或者发送完成, 就不能在接收原信号发送的内容了.
+    [[subject takeUntil:signal] subscribeNext:^(id x) {
+        NSLog(@"%@", x);
+    }];
+    
+    [subject sendNext:@"数据A"];
+    [signal  sendNext:@"数据B"]; // | [signal sendCompleted];
+    [subject sendNext:@"数据C"];
+    [subject sendNext:@"数据D"];
 }
 
 - (void)doNext{
@@ -920,6 +989,148 @@
 // combineLatest：合并信号，并且拿到各个信号的最新的值,必须每个合并的signal至少都有过一次sendNext，才会触发合并的信号
 // combineLatestWith：合并信号，当两个信号都有sendNext才会触发合并的信号
 
+
+- (void)timeout {
+    NSLog(@"timeout");
+    RACSignal *signal = [[RACSignal createSignal:^RACDisposable *(id<RACSubscriber> subscriber) {
+        [subscriber sendNext:@"hello, RAC."];
+//        [subscriber sendCompleted];
+        return nil;
+    }] timeout:3.0 onScheduler:[RACScheduler currentScheduler]];
+    
+    [signal subscribeNext:^(id x) {
+        NSLog(@"%@", x);
+    } error:^(NSError *error) {
+        NSLog(@"%@", error);
+    }];
+}
+
+- (void)interval {
+    [[RACSignal interval:3.0 onScheduler:[RACScheduler currentScheduler]] subscribeNext:^(id x) {
+        NSLog(@"%@", x);
+    }];
+}
+
+- (void)delay {
+    NSLog(@"delay");
+    [[[RACSignal createSignal:^RACDisposable *(id<RACSubscriber> subscriber) {
+        [subscriber sendNext:@"hello, RAC."];
+        return nil;
+    }] delay:2.0] subscribeNext:^(id x) {
+        NSLog(@"%@", x);
+    }];
+}
+
+- (void)dispose {
+    RACSignal *signal = [RACSignal createSignal:^RACDisposable *(id<RACSubscriber> subscriber ) {
+        [subscriber sendNext:@"hello, RAC."];
+        
+        // 如果信号不再发送数据, 最好调用信号的发送完成方法, 该方法会调用 [RACDisposable disposable] 取消订阅信号
+//        [subscriber sendCompleted];
+        
+        return [RACDisposable disposableWithBlock:^{
+            // 订阅者释放时会自动取消订阅信号, 但是只要订阅者没有释放, 就不会取消订阅信号
+            NSLog(@"信号被取消订阅了!");
+        }];
+    }];
+    
+    self.textDisposable = [signal subscribeNext:^(id x) {
+        NSLog(@"%@", x);
+    }];
+}
+
+- (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
+    // 主动取消订阅信号
+    [self.textDisposable dispose];
+}
+
+- (void)RACTuple {
+    RACTuple *tuple = [RACTuple tupleWithObjectsFromArray:@[@"B", @"R", @"A", @"C", @"."]];
+    NSLog(@"%@", tuple[0]);
+    NSLog(@"%@", tuple[2]);
+}
+
+- (void)NSArray {
+    NSArray *array = @[@"B", @"R", @"A", @"C", @"."];
+    [array.rac_sequence.signal subscribeNext:^(id x) {
+        NSLog(@"%@", x);
+    }];
+}
+
+- (void)NSDictionary {
+    NSDictionary *dictionary = @{@"name": @"willing", @"age": @"26"};
+    [dictionary.rac_sequence.signal subscribeNext:^(RACTuple *x) {
+        // 方式一:
+//        NSString *key = x[0];
+//        NSString *value = x[1];
+//        NSLog(@"%@: %@", key, value);
+        
+        // 方式二:
+        // RACTupleUnpack: 解析元组, 参数是解析出来的变量名, '=' 右边是被解析的元组
+        RACTupleUnpack(NSString *key, NSString *value) = x;
+        NSLog(@"%@: %@", key, value);
+    }];
+}
+
+- (void)liftSelector {
+    // 需求: 多个请求全部完成后再刷新 UI
+    RACSignal *hotSignal = [RACSignal createSignal:^RACDisposable *(id<RACSubscriber> subscriber) {
+        NSLog(@"请求热销模块数据");
+        [subscriber sendNext:@"热销模块数据"];
+        return nil;
+    }];
+    RACSignal *newSignal = [RACSignal createSignal:^RACDisposable *(id<RACSubscriber> subscriber) {
+        NSLog(@"请求最新模块数据");
+        [subscriber sendNext:@"最新模块数据"];
+        return nil;
+    }];
+    // withSignalsFromArray 中的所有信号都发送数据后才会执行 selector, selector 的参数就是每个信号发送的数据
+    [self rac_liftSelector:@selector(updateUIWithHotData:newData:) withSignalsFromArray:@[hotSignal, newSignal]];
+}
+
+- (void)updateUIWithHotData:(NSString *)hotData newData:(NSString *)newData {
+    // 刷新 UI
+    NSLog(@"%@", hotData);
+    NSLog(@"%@", newData);
+}
+
+- (void)bind {
+    
+    // 1.原信号
+    RACSubject *subject = [RACSubject subject];
+    
+    // 2.绑定信号
+    RACSignal *bindSignal = [subject bind:^RACSignalBindBlock _Nonnull{
+        return ^RACSignal *(id value, BOOL *stop) {
+            NSLog(@"原信号发送的内容: %@", value);
+            value = [NSString stringWithFormat:@"解析后的%@",value];
+            // 不能 return nil, 可以 return [RACSignal empty].
+            return [RACReturnSignal return:value];
+        };
+    }];
+    
+    // 3.订阅绑定信号
+    [bindSignal subscribeNext:^(id x) {
+        NSLog(@"绑定信号发送的内容: %@", x);
+    }];
+    
+    // 4.原信号发送数据
+    [subject sendNext:@"JSON数据"];
+}
+
+- (void)skip {
+    // skip: 跳过 skipCount 次信号.
+    RACSubject *subject = [RACSubject subject];
+    [[subject skip:2] subscribeNext:^(id x) {
+        NSLog(@"%@", x);
+    }];
+    [subject sendNext:@"数据A"];
+    [subject sendNext:@"数据B"];
+    [subject sendNext:@"数据C"];
+    [subject sendNext:@"数据D"];
+    
+    // C,D 输出
+}
 
 @end
 
